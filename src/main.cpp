@@ -1,5 +1,8 @@
 #include <iostream>
+#include <vector>
 #include <ncurses.h>
+#include <algorithm>
+#include <fstream>
 
 using namespace std;
 
@@ -24,6 +27,7 @@ class Sudoku {
 	void render () {
 		// clear screen
 		initscr ();
+		noecho();
 		clear ();
 		
 		// setup color
@@ -59,12 +63,17 @@ class Sudoku {
 			}
 			printw ("+---+---+---+---+---+---+---+---+---+\n");
 		}
-		printw ("Q: Quit\t\t Arrow Keys: Move\nS: Save game\t L: Load game\n");
+		printw ("Q: Quit\t\t WASD: Move\nE: Export game\t L: Load game\n");
 		if (warn) {
 			attron(COLOR_PAIR(1));
 			printw ("'%d' can't be filled in here.\n", wrong);
 			attroff(COLOR_PAIR(1));
 			warn = false;
+		}
+		if (finished ()) {
+			attron(COLOR_PAIR(2));
+			printw ("Game cleared!!\n");
+			attroff(COLOR_PAIR(2));
 		}
 		move_cursor ();
 		refresh ();
@@ -124,7 +133,7 @@ class Sudoku {
 				case 's':
 					while (! found) {
 						if (++coord_y == 9) {
-							coord_x = tmp_x;
+							coord_y = tmp_y;
 							found = true;
 						}
 						else if (check_range (coord_y, coord_x)) {
@@ -133,13 +142,20 @@ class Sudoku {
 						}
 					}
 					break;
+				case 'e': // save game
+					save_to_file ();
+					break;
+
+				case 'l': // load game
+					load_from_file ();
+					break;
 
 				default:
 					if (control <= '9' && control >= '1') {
 						entries[coord_y][coord_x] = 10 + control - '0';
 						if (! is_valid ()) {
 							warn = true;
-							wrong = entries[coord_y][coord_x]; 
+							wrong = entries[coord_y][coord_x] % 10; 
 							entries[coord_y][coord_x] = tmp_sol;
 						}
 					}
@@ -165,6 +181,39 @@ class Sudoku {
 		move (cursor_y, cursor_x);
 	}
 	bool is_valid () {
+		for (int i = 0;i < 9; i++) {
+			vector<int> row;
+			for (int j = 0; j < 9; j++) {
+				int val = entries[i][j] % 10;
+				if (find (row.begin (), row.end (), val) == row.end ())
+					row.push_back (val);
+				else if (val != 0)
+					return false;
+			}
+		}
+		for (int j = 0;j < 9; j++) {
+			vector<int> col;
+			for (int i = 0; i < 9; i++) {
+				int val = entries[i][j] % 10;
+				if (find (col.begin (), col.end (), val) == col.end ())
+					col.push_back (val);
+				else if (val != 0)
+					return false;
+			}
+		}
+		for (int i = 0;i < 9; i++) {
+			vector<int> block;
+			for (int j = 0; j < 9; j++) {
+				int y = (i / 3) * 3 + (j / 3);
+				int x = (i % 3) * 3 + (j % 3);
+				int val = entries[y][x] % 10;
+				if (find (block.begin (), block.end (), val) == block.end ())
+					block.push_back (val);
+				else if (val != 0)
+					return false;
+			}
+		}
+
 		return true;
 	}
 	bool check_range (int i, int j) {
@@ -172,6 +221,32 @@ class Sudoku {
 			return true;
 		else
 			return false;
+	}
+	bool finished () {
+		for (int i = 0;i < 9; i++)
+			for (int j = 0; j < 9; j++)
+				if (entries[i][j] == 0)
+					return false;
+		return true;
+	}
+	void save_to_file () {
+		ofstream myfile;
+		myfile.open ("record.txt");
+		for (int i = 0;i < 9; i++) {
+			for (int j = 0; j < 9; j++)
+				myfile << entries[i][j] << " ";
+			myfile << "\n";
+		}
+		myfile.close ();
+	}
+	void load_from_file () {
+		ifstream myfile;
+		myfile.open ("record.txt");
+		for (int i = 0;i < 9; i++) 
+			for (int j = 0; j < 9; j++)
+				myfile >> entries[i][j];
+
+
 	}
 };
 
